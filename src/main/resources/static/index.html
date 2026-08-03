@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTT 통합 검색 & 인기 랭킹</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #141414;
+            color: #ffffff;
+            margin: 0;
+            padding: 30px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #e50914;
+            margin-bottom: 20px;
+        }
+
+        /* 탭 스타일 */
+        .tab-menu {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .tab-btn {
+            background-color: #222;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 10px 24px;
+            font-size: 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .tab-btn.active {
+            background-color: #e50914;
+            color: white;
+            border-color: #e50914;
+            font-weight: bold;
+        }
+
+        /* 구독 OTT 필터 영역 */
+        .filter-box {
+            background-color: #1f1f1f;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 1px solid #333;
+        }
+        .filter-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #e50914;
+            margin-bottom: 10px;
+        }
+        .my-ott-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .ott-checkbox-label {
+            font-size: 14px;
+            cursor: pointer;
+            /* ✨ 너비 자동 조정을 위한 핵심 속성 */
+            display: inline-flex;  /* inline 요소처럼 동작하여 콘텐츠(글자) 크기만큼만 너비를 가집니다 */
+            width: fit-content;    /* 내용물(텍스트 + 체크박스)의 너비에 딱 맞게 조절합니다 */
+
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;  /* 글자 수가 길어져도 아래로 줄바꿈되지 않게 방지합니다 */
+        }
+
+        /* 검색 영역 */
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        select, input, button {
+            padding: 12px 16px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: none;
+        }
+        select, input {
+            background-color: #333;
+            color: white;
+        }
+        input { width: 50%; }
+        button {
+            background-color: #e50914;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { background-color: #b81d24; }
+
+        /* 결과 카드 */
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            display: flex;
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .poster {
+            width: 140px;
+            height: 210px;
+            object-fit: cover;
+            background-color: #333;
+        }
+        .info {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+        .release-date { font-size: 14px; color: #aaa; margin-bottom: 12px; }
+        .overview {
+            font-size: 14px;
+            color: #ccc;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .ott-section { display: flex; align-items: center; gap: 10px; }
+        .ott-title { font-size: 14px; font-weight: bold; color: #aaa; }
+        .ott-logos { display: flex; gap: 8px; }
+        .ott-logo { width: 32px; height: 32px; border-radius: 6px; }
+        .no-ott { font-size: 13px; color: #777; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 어디서 볼 수 있지? (OTT Hub)</h1>
+
+    <!-- 1. 탭 메뉴 -->
+    <div class="tab-menu">
+        <button class="tab-btn active" id="tabSearchBtn" onclick="switchTab('search')">🔍 OTT 검색</button>
+        <button class="tab-btn" id="tabTrendingBtn" onclick="switchTab('trending')">🔥 이번 주 인기 영화</button>
+    </div>
+
+    <!-- 2. 내가 구독 중인 OTT 필터 -->
+    <div class="filter-box">
+        <div class="filter-title">💳 내가 구독 중인 OTT 선택 (체크 시 해당 OTT 포함 작품만 표시)</div>
+        <div class="my-ott-list">
+            <label class="ott-checkbox-label"><input type="checkbox" class="ott-filter" value="Netflix" onchange="applyFilter()"> 넷플릭스</label>
+            <label class="ott-checkbox-label"><input type="checkbox" class="ott-filter" value="Disney Plus" onchange="applyFilter()"> 디즈니+</label>
+            <label class="ott-checkbox-label"><input type="checkbox" class="ott-filter" value="Wavve" onchange="applyFilter()"> 웨이브</label>
+            <label class="ott-checkbox-label"><input type="checkbox" class="ott-filter" value="Watcha" onchange="applyFilter()"> 왓챠</label>
+            <label class="ott-checkbox-label"><input type="checkbox" class="ott-filter" value="Coupang Play" onchange="applyFilter()"> 쿠팡플레이</label>
+        </div>
+    </div>
+
+    <!-- 3. 검색 창 (검색 탭일 때만 활성화) -->
+    <div class="search-box" id="searchBox">
+        <select id="typeSelect">
+            <option value="multi">통합 (영화+TV)</option>
+            <option value="movie">영화</option>
+            <option value="tv">TV / 드라마</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="검색어를 입력하세요 (예: 기생충, 무빙)">
+        <button onclick="search()">검색</button>
+    </div>
+
+    <!-- 4. 결과 출력 영역 -->
+    <div class="results" id="resultsList"></div>
+</div>
+
+<script>
+    let currentRawData = []; // 서버에서 받아온 원본 데이터 저장용
+    let currentTab = 'search';
+
+    // 탭 전환 함수
+    function switchTab(tab) {
+        currentTab = tab;
+        document.getElementById('tabSearchBtn').classList.toggle('active', tab === 'search');
+        document.getElementById('tabTrendingBtn').classList.toggle('active', tab === 'trending');
+
+        const searchBox = document.getElementById('searchBox');
+        if (tab === 'search') {
+            searchBox.style.display = 'flex';
+            document.getElementById('resultsList').innerHTML = '';
+            currentRawData = [];
+        } else {
+            searchBox.style.display = 'none';
+            loadTrendingMovies();
+        }
+    }
+
+    // 인기 영화 불러오기
+    async function loadTrendingMovies() {
+        const resultsList = document.getElementById('resultsList');
+        resultsList.innerHTML = '<p style="text-align:center;">인기 영화 랭킹 로딩 중...</p>';
+
+        try {
+            const response = await fetch('/api/ott/trending/movies');
+            currentRawData = await response.json();
+            applyFilter(); // 데이터 수집 후 구독 필터 적용하여 출력
+        } catch (error) {
+            console.error('Error:', error);
+            resultsList.innerHTML = '<p style="text-align:center; color:red;">랭킹 데이터를 불러오는 중 오류가 발생했습니다.</p>';
+        }
+    }
+
+    // 검색 실행
+    async function search() {
+        const query = document.getElementById('searchInput').value;
+        const type = document.getElementById('typeSelect').value;
+        const resultsList = document.getElementById('resultsList');
+
+        if (!query.trim()) {
+            alert('검색어를 입력해주세요!');
+            return;
+        }
+
+        resultsList.innerHTML = '<p style="text-align:center;">검색 중...</p>';
+        let endpoint = '/api/ott/search/multi/integrated'; // 기본값 (통합)
+
+        if (type === 'movie') {
+            endpoint = '/api/ott/search/integrated';
+        } else if (type === 'tv') {
+            endpoint = '/api/ott/search/tv/integrated';
+        }
+
+        try {
+            const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`);
+            currentRawData = await response.json();
+            applyFilter(); // 데이터 수집 후 구독 필터 적용하여 출력
+        } catch (error) {
+            console.error('Error:', error);
+            resultsList.innerHTML = '<p style="text-align:center; color:red;">검색 중 오류가 발생했습니다.</p>';
+        }
+    }
+
+    // 구독 OTT 필터링 및 화면 렌더링 함수
+    function applyFilter() {
+        const resultsList = document.getElementById('resultsList');
+
+        // 체크된 OTT 목록 가져오기
+        const checkedOtts = Array.from(document.querySelectorAll('.ott-filter:checked')).map(cb => cb.value);
+
+        if (currentRawData.length === 0) {
+            if (currentTab === 'search') {
+                resultsList.innerHTML = '<p style="text-align:center;">검색 결과가 없습니다.</p>';
+            }
+            return;
+        }
+
+        // 구독 필터 조건 적용
+        let filteredData = currentRawData;
+        if (checkedOtts.length > 0) {
+            filteredData = currentRawData.filter(item => {
+                if (!item.ottProviders || item.ottProviders.length === 0) return false;
+                // 작품의 OTT 목록 중 내가 체크한 OTT가 하나라도 포함되어 있는지 검사
+                return item.ottProviders.some(provider => checkedOtts.includes(provider.provider_name));
+            });
+        }
+
+        resultsList.innerHTML = '';
+
+        if (filteredData.length === 0) {
+            resultsList.innerHTML = '<p style="text-align:center; color:#aaa;">선택하신 구독 OTT에서 볼 수 있는 작품이 없습니다.</p>';
+            return;
+        }
+
+        // HTML 카드 생성
+        filteredData.forEach(item => {
+            const posterUrl = item.posterPath
+                ? `https://image.tmdb.org/t/p/w500${item.posterPath}`
+                : 'https://via.placeholder.com/140x210?text=No+Image';
+
+            let ottHtml = '';
+            if (item.ottProviders && item.ottProviders.length > 0) {
+                const logos = item.ottProviders.map(provider =>
+                    `<img class="ott-logo" src="https://image.tmdb.org/t/p/w92${provider.logo_path}" title="${provider.provider_name}" alt="${provider.provider_name}">`
+                ).join('');
+                ottHtml = `<div class="ott-logos">${logos}</div>`;
+            } else {
+                ottHtml = `<span class="no-ott">현재 제공 중인 OTT 없음</span>`;
+            }
+
+            const cardHtml = `
+                <div class="card">
+                    <img class="poster" src="${posterUrl}" alt="${item.title}">
+                    <div class="info">
+                        <div>
+                            <div class="title">${item.title}</div>
+                            <div class="release-date">개봉/방영일: ${item.releaseDate || '정보 없음'}</div>
+                            <div class="overview">${item.overview || '줄거리 정보가 없습니다.'}</div>
+                        </div>
+                        <div class="ott-section">
+                            <span class="ott-title">시청 가능 OTT:</span>
+                            ${ottHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultsList.innerHTML += cardHtml;
+        });
+    }
+
+    // Enter키 눌렀을 때 검색 실행
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') search();
+    });
+</script>
+
+</body>
+</html>
