@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTT 통합 검색 & 인기 랭킹</title>
+    <title>OTT Hub - 검색 추천 & 무한 스크롤</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -22,12 +22,12 @@
             margin-bottom: 20px;
         }
 
-        /* 탭 스타일 */
+        /* 탭 메뉴 */
         .tab-menu {
             display: flex;
             justify-content: center;
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
         .tab-btn {
             background-color: #222;
@@ -46,12 +46,12 @@
             font-weight: bold;
         }
 
-        /* 구독 OTT 필터 영역 */
+        /* 구독 OTT 필터 */
         .filter-box {
             background-color: #1f1f1f;
             padding: 15px 20px;
             border-radius: 8px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             border: 1px solid #333;
         }
         .filter-title {
@@ -68,20 +68,57 @@
         .ott-checkbox-label {
             font-size: 14px;
             cursor: pointer;
-            /* ✨ 너비 자동 조정을 위한 핵심 속성 */
-            display: inline-flex;  /* inline 요소처럼 동작하여 콘텐츠(글자) 크기만큼만 너비를 가집니다 */
-            width: fit-content;    /* 내용물(텍스트 + 체크박스)의 너비에 딱 맞게 조절합니다 */
-
+            display: inline-flex;
+            width: fit-content;
             align-items: center;
             gap: 5px;
-            white-space: nowrap;  /* 글자 수가 길어져도 아래로 줄바꿈되지 않게 방지합니다 */
+            white-space: nowrap;
         }
 
-        /* 검색 영역 */
+        /* 최근 검색어 태그 칩 */
+        .recent-search-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .recent-title {
+            font-size: 13px;
+            color: #aaa;
+        }
+        .recent-chip {
+            background-color: #333;
+            color: #ddd;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .recent-chip:hover {
+            background-color: #444;
+            color: #fff;
+        }
+        .chip-delete {
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+        }
+        .chip-delete:hover {
+            color: #e50914;
+        }
+
+        /* 검색 영역 & 자동완성 */
+        .search-container {
+            position: relative;
+            margin-bottom: 25px;
+        }
         .search-box {
             display: flex;
             gap: 10px;
-            margin-bottom: 30px;
             justify-content: center;
         }
         select, input, button {
@@ -94,7 +131,7 @@
             background-color: #333;
             color: white;
         }
-        input { width: 50%; }
+        input { flex: 1; }
         button {
             background-color: #e50914;
             color: white;
@@ -103,7 +140,33 @@
         }
         button:hover { background-color: #b81d24; }
 
-        /* 결과 카드 */
+        /* 자동완성 추천 레이어 */
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 125px;
+            right: 85px;
+            background-color: #222;
+            border: 1px solid #444;
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            font-size: 14px;
+        }
+        .autocomplete-item:hover {
+            background-color: #333;
+            color: #e50914;
+        }
+
+        /* 카드 목록 */
         .results {
             display: flex;
             flex-direction: column;
@@ -121,6 +184,7 @@
             height: 210px;
             object-fit: cover;
             background-color: #333;
+            cursor: pointer;
         }
         .info {
             padding: 20px;
@@ -129,7 +193,7 @@
             flex-direction: column;
             justify-content: space-between;
         }
-        .title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+        .title { font-size: 20px; font-weight: bold; margin-bottom: 8px; cursor: pointer; }
         .release-date { font-size: 14px; color: #aaa; margin-bottom: 12px; }
         .overview {
             font-size: 14px;
@@ -146,6 +210,57 @@
         .ott-logos { display: flex; gap: 8px; }
         .ott-logo { width: 32px; height: 32px; border-radius: 6px; }
         .no-ott { font-size: 13px; color: #777; }
+
+        /* 무한 스크롤 센서 / 스피너 */
+        .scroll-trigger {
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #1f1f1f;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            border-radius: 12px;
+            padding: 25px;
+            position: relative;
+            overflow-y: auto;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.8);
+        }
+        .modal-close {
+            position: absolute;
+            top: 15px; right: 20px;
+            font-size: 28px;
+            color: #aaa;
+            cursor: pointer;
+        }
+        .modal-close:hover { color: white; }
+        .modal-header { display: flex; gap: 20px; margin-bottom: 20px; }
+        .modal-poster { width: 120px; border-radius: 8px; object-fit: cover; }
+        .modal-info { flex: 1; }
+        .modal-title { font-size: 22px; font-weight: bold; margin-bottom: 8px; color: #fff; }
+        .modal-meta { font-size: 14px; color: #aaa; margin-bottom: 8px; }
+        .modal-rating { color: #ffc107; font-weight: bold; font-size: 15px; }
+        .modal-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; }
+        .modal-section-title { font-size: 15px; font-weight: bold; color: #e50914; margin-bottom: 8px; }
+        .modal-text { font-size: 14px; color: #ddd; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -159,7 +274,7 @@
         <button class="tab-btn" id="tabTrendingBtn" onclick="switchTab('trending')">🔥 이번 주 인기 영화</button>
     </div>
 
-    <!-- 2. 내가 구독 중인 OTT 필터 -->
+    <!-- 2. 구독 OTT 필터 -->
     <div class="filter-box">
         <div class="filter-title">💳 내가 구독 중인 OTT 선택 (체크 시 해당 OTT 포함 작품만 표시)</div>
         <div class="my-ott-list">
@@ -171,107 +286,288 @@
         </div>
     </div>
 
-    <!-- 3. 검색 창 (검색 탭일 때만 활성화) -->
-    <div class="search-box" id="searchBox">
-        <select id="typeSelect">
-            <option value="multi">통합 (영화+TV)</option>
-            <option value="movie">영화</option>
-            <option value="tv">TV / 드라마</option>
-        </select>
-        <input type="text" id="searchInput" placeholder="검색어를 입력하세요 (예: 기생충, 무빙)">
-        <button onclick="search()">검색</button>
+    <!-- 3. 검색 영역 & 최근 검색어 -->
+    <div class="search-container" id="searchContainer">
+        <!-- 최근 검색어 칩 -->
+        <div class="recent-search-box" id="recentSearchBox"></div>
+
+        <div class="search-box">
+            <select id="typeSelect">
+                <option value="multi">통합 (영화+TV)</option>
+                <option value="movie">영화</option>
+                <option value="tv">TV / 드라마</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="검색어를 입력하세요 (예: 기생충, 무빙)" autocomplete="off">
+            <button onclick="initiateNewSearch()">검색</button>
+        </div>
+
+        <!-- 실시간 자동완성 추천 레이어 -->
+        <div class="autocomplete-list" id="autocompleteList"></div>
     </div>
 
     <!-- 4. 결과 출력 영역 -->
     <div class="results" id="resultsList"></div>
+
+    <!-- 5. 무한 스크롤 센서 -->
+    <div class="scroll-trigger" id="scrollTrigger"></div>
+</div>
+
+<!-- 모달 레이어 팝업 -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div id="modalBody">
+            <p style="text-align: center;">로딩 중...</p>
+        </div>
+    </div>
 </div>
 
 <script>
-    let currentRawData = []; // 서버에서 받아온 원본 데이터 저장용
+    let currentRawData = [];  // 서버에서 누적받은 전체 데이터
     let currentTab = 'search';
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = true;
+    let debounceTimer = null;
 
-    // 탭 전환 함수
+    // 초기화 및 이벤트 리스너 등록
+    document.addEventListener('DOMContentLoaded', () => {
+        renderRecentSearches();
+        setupInfiniteScroll();
+
+        // 입력창 자동완성 (Debounce 300ms)
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const query = e.target.value.trim();
+
+            if (!query) {
+                hideAutocomplete();
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetchAutocomplete(query);
+            }, 300);
+        });
+
+        // 엔터키 검색
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                hideAutocomplete();
+                initiateNewSearch();
+            }
+        });
+
+        // 바깥 클릭 시 자동완성 레이어 닫기
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) {
+                hideAutocomplete();
+            }
+        });
+    });
+
+    // 탭 전환
     function switchTab(tab) {
         currentTab = tab;
         document.getElementById('tabSearchBtn').classList.toggle('active', tab === 'search');
         document.getElementById('tabTrendingBtn').classList.toggle('active', tab === 'trending');
 
-        const searchBox = document.getElementById('searchBox');
+        const searchContainer = document.getElementById('searchContainer');
+        resetState();
+
         if (tab === 'search') {
-            searchBox.style.display = 'flex';
+            searchContainer.style.display = 'block';
             document.getElementById('resultsList').innerHTML = '';
-            currentRawData = [];
         } else {
-            searchBox.style.display = 'none';
-            loadTrendingMovies();
+            searchContainer.style.display = 'none';
+            loadData();
         }
     }
 
-    // 인기 영화 불러오기
-    async function loadTrendingMovies() {
-        const resultsList = document.getElementById('resultsList');
-        resultsList.innerHTML = '<p style="text-align:center;">인기 영화 랭킹 로딩 중...</p>';
-
-        try {
-            const response = await fetch('/api/ott/trending/movies');
-            currentRawData = await response.json();
-            applyFilter(); // 데이터 수집 후 구독 필터 적용하여 출력
-        } catch (error) {
-            console.error('Error:', error);
-            resultsList.innerHTML = '<p style="text-align:center; color:red;">랭킹 데이터를 불러오는 중 오류가 발생했습니다.</p>';
-        }
-    }
-
-    // 검색 실행
-    async function search() {
-        const query = document.getElementById('searchInput').value;
-        const type = document.getElementById('typeSelect').value;
-        const resultsList = document.getElementById('resultsList');
-
-        if (!query.trim()) {
+    // 새로운 검색 시작 (1페이지부터 초기화)
+    function initiateNewSearch() {
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) {
             alert('검색어를 입력해주세요!');
             return;
         }
+        saveRecentSearch(query);
+        resetState();
+        loadData();
+    }
 
-        resultsList.innerHTML = '<p style="text-align:center;">검색 중...</p>';
-        let endpoint = '/api/ott/search/multi/integrated'; // 기본값 (통합)
+    // 상태 초기화
+    function resetState() {
+        currentRawData = [];
+        currentPage = 1;
+        hasMore = true;
+        isLoading = false;
+        document.getElementById('resultsList').innerHTML = '';
+        document.getElementById('scrollTrigger').innerText = '';
+    }
 
-        if (type === 'movie') {
-            endpoint = '/api/ott/search/integrated';
-        } else if (type === 'tv') {
-            endpoint = '/api/ott/search/tv/integrated';
+    // 데이터 호출 (검색 or 인기 영화)
+    async function loadData() {
+        if (isLoading || !hasMore) return;
+        isLoading = true;
+
+        const trigger = document.getElementById('scrollTrigger');
+        trigger.innerText = '⏳ 데이터 로딩 중...';
+
+        let url = '';
+        if (currentTab === 'search') {
+            const query = document.getElementById('searchInput').value.trim();
+            const type = document.getElementById('typeSelect').value;
+            let endpoint = '/api/ott/search/multi/integrated';
+            if (type === 'movie') endpoint = '/api/ott/search/integrated';
+            if (type === 'tv') endpoint = '/api/ott/search/tv/integrated';
+
+            url = `${endpoint}?query=${encodeURIComponent(query)}&page=${currentPage}`;
+        } else {
+            url = `/api/ott/trending/movies?page=${currentPage}`;
         }
 
         try {
-            const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`);
-            currentRawData = await response.json();
-            applyFilter(); // 데이터 수집 후 구독 필터 적용하여 출력
+            const response = await fetch(url);
+            const newData = await response.json();
+
+            if (newData.length === 0) {
+                hasMore = false;
+                trigger.innerText = currentPage === 1 ? '검색 결과가 없습니다.' : '모든 데이터를 불러왔습니다.';
+                isLoading = false;
+                return;
+            }
+
+            // 기존 데이터 배열에 추가
+            currentRawData = [...currentRawData, ...newData];
+            currentPage++;
+            trigger.innerText = '';
+
+            applyFilter(); // 화면 렌더링
         } catch (error) {
             console.error('Error:', error);
-            resultsList.innerHTML = '<p style="text-align:center; color:red;">검색 중 오류가 발생했습니다.</p>';
+            trigger.innerText = '데이터를 불러오는 중 오류가 발생했습니다.';
+        } finally {
+            isLoading = false;
         }
     }
 
-    // 구독 OTT 필터링 및 화면 렌더링 함수
-    function applyFilter() {
-        const resultsList = document.getElementById('resultsList');
-
-        // 체크된 OTT 목록 가져오기
-        const checkedOtts = Array.from(document.querySelectorAll('.ott-filter:checked')).map(cb => cb.value);
-
-        if (currentRawData.length === 0) {
-            if (currentTab === 'search') {
-                resultsList.innerHTML = '<p style="text-align:center;">검색 결과가 없습니다.</p>';
+    // 무한 스크롤 Observer 설정
+    function setupInfiniteScroll() {
+        const trigger = document.getElementById('scrollTrigger');
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && !isLoading && hasMore) {
+                // 검색 탭이고 입력값이 있을 때, 또는 트렌딩 탭일 때 실행
+                if (currentTab === 'trending' || document.getElementById('searchInput').value.trim()) {
+                    loadData();
+                }
             }
+        }, { threshold: 0.1 });
+
+        observer.observe(trigger);
+    }
+
+    // 실시간 자동완성 API 연동
+    async function fetchAutocomplete(query) {
+        try {
+            const response = await fetch(`/api/ott/search/multi/integrated?query=${encodeURIComponent(query)}&page=1`);
+            const data = await response.json();
+
+            const autoList = document.getElementById('autocompleteList');
+            autoList.innerHTML = '';
+
+            if (data.length === 0) {
+                hideAutocomplete();
+                return;
+            }
+
+            // 상위 5개 추천
+            data.slice(0, 5).forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.innerText = item.title;
+                div.onclick = () => {
+                    // 원본 제목에서 [영화], [TV] 태그 제거 후 검색창 삽입
+                    const cleanTitle = item.title.replace(/^\[(영화|TV)\]\s*/, '');
+                    document.getElementById('searchInput').value = cleanTitle;
+                    hideAutocomplete();
+                    initiateNewSearch();
+                };
+                autoList.appendChild(div);
+            });
+
+            autoList.style.display = 'block';
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function hideAutocomplete() {
+        document.getElementById('autocompleteList').style.display = 'none';
+    }
+
+    // 최근 검색어 (localStorage) 관련 기능
+    function getRecentSearches() {
+        return JSON.parse(localStorage.getItem('recentOttSearches') || '[]');
+    }
+
+    function saveRecentSearch(keyword) {
+        let searches = getRecentSearches();
+        // 중복 제거
+        searches = searches.filter(k => k !== keyword);
+        // 맨 앞에 추가
+        searches.unshift(keyword);
+        // 최대 5개 유지
+        if (searches.length > 5) searches.pop();
+
+        localStorage.setItem('recentOttSearches', JSON.stringify(searches));
+        renderRecentSearches();
+    }
+
+    function deleteRecentSearch(keyword, event) {
+        event.stopPropagation(); // 칩 클릭 이벤트 중단
+        let searches = getRecentSearches();
+        searches = searches.filter(k => k !== keyword);
+        localStorage.setItem('recentOttSearches', JSON.stringify(searches));
+        renderRecentSearches();
+    }
+
+    function renderRecentSearches() {
+        const box = document.getElementById('recentSearchBox');
+        const searches = getRecentSearches();
+
+        if (searches.length === 0) {
+            box.innerHTML = '';
             return;
         }
 
-        // 구독 필터 조건 적용
+        let html = '<span class="recent-title">최근 검색:</span>';
+        searches.forEach(k => {
+            html += `
+                <div class="recent-chip" onclick="searchByChip('${k}')">
+                    ${k}
+                    <span class="chip-delete" onclick="deleteRecentSearch('${k}', event)">&times;</span>
+                </div>
+            `;
+        });
+        box.innerHTML = html;
+    }
+
+    function searchByChip(keyword) {
+        document.getElementById('searchInput').value = keyword;
+        initiateNewSearch();
+    }
+
+    // 구독 OTT 필터 및 화면 렌더링
+    function applyFilter() {
+        const resultsList = document.getElementById('resultsList');
+        const checkedOtts = Array.from(document.querySelectorAll('.ott-filter:checked')).map(cb => cb.value);
+
         let filteredData = currentRawData;
         if (checkedOtts.length > 0) {
             filteredData = currentRawData.filter(item => {
                 if (!item.ottProviders || item.ottProviders.length === 0) return false;
-                // 작품의 OTT 목록 중 내가 체크한 OTT가 하나라도 포함되어 있는지 검사
                 return item.ottProviders.some(provider => checkedOtts.includes(provider.provider_name));
             });
         }
@@ -279,11 +575,10 @@
         resultsList.innerHTML = '';
 
         if (filteredData.length === 0) {
-            resultsList.innerHTML = '<p style="text-align:center; color:#aaa;">선택하신 구독 OTT에서 볼 수 있는 작품이 없습니다.</p>';
+            resultsList.innerHTML = '<p style="text-align:center; color:#aaa; padding:20px;">조건에 맞는 작품이 없습니다.</p>';
             return;
         }
 
-        // HTML 카드 생성
         filteredData.forEach(item => {
             const posterUrl = item.posterPath
                 ? `https://image.tmdb.org/t/p/w500${item.posterPath}`
@@ -299,12 +594,14 @@
                 ottHtml = `<span class="no-ott">현재 제공 중인 OTT 없음</span>`;
             }
 
+            const mediaType = item.title.startsWith('[TV]') ? 'tv' : 'movie';
+
             const cardHtml = `
                 <div class="card">
-                    <img class="poster" src="${posterUrl}" alt="${item.title}">
+                    <img class="poster" src="${posterUrl}" alt="${item.title}" onclick="openModal('${mediaType}', ${item.id})">
                     <div class="info">
                         <div>
-                            <div class="title">${item.title}</div>
+                            <div class="title" onclick="openModal('${mediaType}', ${item.id})">${item.title}</div>
                             <div class="release-date">개봉/방영일: ${item.releaseDate || '정보 없음'}</div>
                             <div class="overview">${item.overview || '줄거리 정보가 없습니다.'}</div>
                         </div>
@@ -319,10 +616,77 @@
         });
     }
 
-    // Enter키 눌렀을 때 검색 실행
-    document.getElementById('searchInput').addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') search();
-    });
+    // 모달 열기/닫기 로직
+    async function openModal(type, id) {
+        const modal = document.getElementById('detailModal');
+        const modalBody = document.getElementById('modalBody');
+
+        modal.style.display = 'flex';
+        modalBody.innerHTML = '<p style="text-align:center; padding: 40px;">상세 정보 로딩 중...</p>';
+
+        try {
+            const response = await fetch(`/api/ott/detail/${type}/${id}`);
+            const data = await response.json();
+
+            const title = data.title || data.name;
+            const releaseDate = data.releaseDate || data.firstAirDate || '정보 없음';
+            const posterPath = data.posterPath || data.poster_path;
+            const posterUrl = posterPath
+                ? `https://image.tmdb.org/t/p/w500${posterPath}`
+                : 'https://via.placeholder.com/120x180?text=No+Image';
+
+            const genres = data.genres ? data.genres.map(g => g.name).join(', ') : '정보 없음';
+
+            let director = '정보 없음';
+            if (data.credits && data.credits.crew) {
+                const dirObj = data.credits.crew.find(c => c.job === 'Director');
+                if (dirObj) director = dirObj.name;
+            }
+
+            let castList = '정보 없음';
+            if (data.credits && data.credits.cast) {
+                castList = data.credits.cast.slice(0, 5).map(c => `${c.name} (${c.character || '역'})`).join(', ');
+            }
+
+            const rating = data.voteAverage ? `⭐ ${data.voteAverage.toFixed(1)} / 10` : '평점 없음';
+
+            modalBody.innerHTML = `
+                <div class="modal-header">
+                    <img class="modal-poster" src="${posterUrl}" alt="${title}">
+                    <div class="modal-info">
+                        <div class="modal-title">${title}</div>
+                        <div class="modal-meta">개봉/방영: ${releaseDate}</div>
+                        <div class="modal-meta">장르: ${genres}</div>
+                        <div class="modal-rating">${rating}</div>
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">🎬 감독</div>
+                    <div class="modal-text">${director}</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">🎭 주요 출연진</div>
+                    <div class="modal-text">${castList}</div>
+                </div>
+                <div class="modal-section">
+                    <div class="modal-section-title">📝 줄거리</div>
+                    <div class="modal-text">${data.overview || '줄거리 상세 정보가 제공되지 않습니다.'}</div>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error:', error);
+            modalBody.innerHTML = '<p style="text-align:center; color:red; padding: 40px;">상세 정보를 불러오는 중 오류가 발생했습니다.</p>';
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('detailModal');
+        if (event.target === modal) closeModal();
+    }
 </script>
 
 </body>

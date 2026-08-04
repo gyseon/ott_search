@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.IntegratedSearchResponse;
+import com.example.demo.dto.TmdbDetailResponse;
 import com.example.demo.dto.TmdbProviderResponse;
 import com.example.demo.dto.TmdbSearchResponse;
 import com.example.demo.service.TmdbService;
@@ -41,13 +42,21 @@ public class OttController {
 
     // ✨ [신규] 인기 영화 랭킹 API
     @GetMapping("/trending/movies")
-    public List<IntegratedSearchResponse> getTrendingMovies() {
-        return tmdbService.getTrendingMoviesWithProviders();
+    public List<IntegratedSearchResponse> getTrendingMovies(@RequestParam(defaultValue = "1") int page) {
+        return tmdbService.getTrendingMoviesWithProviders(page);
     }
 
     // ✨ [신규] 영화 + TV 통합 검색 API
     @GetMapping("/search/multi/integrated")
-    public List<IntegratedSearchResponse> searchMultiIntegrated(@RequestParam String query) {
-        return tmdbService.searchMultiWithProviders(query);
+    public List<IntegratedSearchResponse> searchMultiIntegrated(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "1") int page) {
+        return tmdbService.searchMultiWithProviders(query, page);
+    }
+
+    // ✨ [신규] 상세 정보 조회 API (type: movie 또는 tv)
+    @GetMapping("/detail/{type}/{id}")
+    public TmdbDetailResponse getDetail(@PathVariable String type, @PathVariable Long id) {
+        return tmdbService.getDetail(type, id);
     }
 }

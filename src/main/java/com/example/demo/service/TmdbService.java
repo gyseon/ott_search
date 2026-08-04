@@ -141,12 +141,13 @@ public class TmdbService {
     }
 
     // ✨ [신규] 인기 영화 목록 + OTT 정보 반환 (주간 트렌딩 기준)
-    public List<IntegratedSearchResponse> getTrendingMoviesWithProviders() {
+    public List<IntegratedSearchResponse> getTrendingMoviesWithProviders(int page) {
         // TMDB 주간 트렌딩 영화 API 호출
         TmdbSearchResponse trendingResponse = tmdbWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/trending/movie/week")
                         .queryParam("language", "ko-KR")
+                        .queryParam("page", page) // ✨ 페이지 번호 전달
                         .build())
                 .retrieve()
                 .bodyToMono(TmdbSearchResponse.class)
@@ -184,12 +185,13 @@ public class TmdbService {
     }
 
     // ✨ [신규] 영화 + TV 통합 검색 및 OTT 정보 조립
-    public List<IntegratedSearchResponse> searchMultiWithProviders(String query) {
+    public List<IntegratedSearchResponse> searchMultiWithProviders(String query, int page) {
         TmdbMultiSearchResponse multiResponse = tmdbWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/search/multi")
                         .queryParam("query", query)
                         .queryParam("language", "ko-KR")
+                        .queryParam("page", page) // ✨ 페이지 번호 전달
                         .build())
                 .retrieve()
                 .bodyToMono(TmdbMultiSearchResponse.class)
@@ -237,5 +239,20 @@ public class TmdbService {
             }
         }
         return integratedList;
+    }
+
+    // ✨ [신규] 영화/TV 상세 정보 (출연진, 감독, 장르, 평점) 조회
+    public TmdbDetailResponse getDetail(String type, Long id) {
+        String path = "movie".equals(type) ? "/movie/{id}" : "/tv/{id}";
+
+        return tmdbWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path(path)
+                        .queryParam("language", "ko-KR")
+                        .queryParam("append_to_response", "credits") // 출연진/감독 정보 함께 요청
+                        .build(id))
+                .retrieve()
+                .bodyToMono(TmdbDetailResponse.class)
+                .block();
     }
 }
