@@ -32,5 +32,6 @@ public class TmdbProviderResponse {
 
         @JsonProperty("logo_path")
         private String logoPath;
+
     }
 }

@@ -292,7 +292,69 @@
         .star-btn:hover {
             transform: scale(1.2);
         }
+
+        /* 통계 대시보드 영역 */
+        .stats-container {
+            display: none; /* 내 찜 목록 탭일 때만 활성화 */
+            margin-bottom: 30px;
+        }
+        .recommendation-card {
+            background: linear-gradient(135deg, #1f1f1f 0%, #2b1113 100%);
+            border: 1px solid #e50914;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.2);
+        }
+        .recommendation-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #e50914;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .recommendation-text {
+            font-size: 15px;
+            color: #ffffff;
+            line-height: 1.5;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+        .chart-card {
+            background-color: #1f1f1f;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .chart-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #ddd;
+            margin-bottom: 15px;
+            width: 100%;
+            text-align: left;
+        }
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            height: 250px;
+        }
     </style>
+
+    <!-- Chart.js CDN (차트 시각화 라이브러리) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -336,6 +398,31 @@
 
         <!-- 실시간 자동완성 추천 레이어 -->
         <div class="autocomplete-list" id="autocompleteList"></div>
+    </div>
+
+    <!-- ✨ [신규] 내 찜 목록 스마트 통계 & 추천 대시보드 -->
+    <div class="stats-container" id="statsContainer">
+        <!-- 💡 OTT 인텔리전스 추천 가이드 카드 -->
+        <div class="recommendation-card">
+            <div class="recommendation-title">🤖 AI OTT 구독 가성비 리포트</div>
+            <div class="recommendation-text" id="recommendationText">분석 중...</div>
+        </div>
+
+        <!-- 📊 시각화 차트 그리드 -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">📺 찜한 작품의 OTT 분포</div>
+                <div class="chart-wrapper">
+                    <canvas id="ottChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📊 찜한 작품 수 요약</div>
+                <div class="chart-wrapper">
+                    <canvas id="countChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 4. 결과 출력 영역 -->
@@ -408,18 +495,23 @@
         document.getElementById('tabWatchlistBtn').classList.toggle('active', tab === 'watchlist');
 
         const searchContainer = document.getElementById('searchContainer');
+        const statsContainer = document.getElementById('statsContainer');
         resetState();
 
         if (tab === 'search') {
             searchContainer.style.display = 'block';
+            statsContainer.style.display = 'none';
             document.getElementById('resultsList').innerHTML = '';
         } else if (tab === 'trending') {
             searchContainer.style.display = 'none';
+            statsContainer.style.display = 'none';
             loadData();
         } else if (tab === 'watchlist') {
             // ✨ 찜 목록 탭 선택 시
             searchContainer.style.display = 'none';
+            statsContainer.style.display = 'block'; // ✨ 통계 대시보드 표시
             loadWatchlistData();
+            loadWatchlistStats(); // ✨ 통계 데이터 및 차트 로드
         }
     }
 
@@ -808,6 +900,98 @@
         } catch (e) {
             console.error(e);
         }
+    }
+
+    let ottChartInstance = null;
+    let countChartInstance = null;
+
+    // ✨ 통계 API 호출 및 Chart.js 렌더링
+    async function loadWatchlistStats() {
+        try {
+            const response = await fetch('/api/watchlist/stats');
+            const stats = await response.json();
+
+            // 1. 스마트 가이드 문구 업데이트
+            document.getElementById('recommendationText').innerHTML = stats.recommendationGuide;
+
+            if (stats.totalCount === 0) {
+                if (ottChartInstance) ottChartInstance.destroy();
+                if (countChartInstance) countChartInstance.destroy();
+                return;
+            }
+
+            // 2. OTT 분포 파이 차트(Doughnut) 생성
+            renderOttChart(stats.ottCounts);
+
+            // 3. 찜한 작품 총수 막대 차트 생성
+            renderCountChart(stats.totalCount, stats.topOttCount, stats.topOtt);
+        } catch (e) {
+            console.error('통계 로드 실패:', e);
+        }
+    }
+
+    // OTT 도넛 차트
+    function renderOttChart(ottCounts) {
+        const ctx = document.getElementById('ottChart').getContext('2d');
+        if (ottChartInstance) ottChartInstance.destroy(); // 기존 차트 초기화
+
+        const labels = Object.keys(ottCounts);
+        const data = Object.values(ottCounts);
+
+        ottChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#e50914', '#00d2ff', '#ffc107', '#9b51e0', '#2ed573', '#ff6b81'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#1f1f1f'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#ccc', font: { size: 12 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // 막대 차트 (총 작품 수 vs 1위 OTT 작품 수)
+    function renderCountChart(totalCount, topOttCount, topOttName) {
+        const ctx = document.getElementById('countChart').getContext('2d');
+        if (countChartInstance) countChartInstance.destroy();
+
+        countChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['전체 찜 작품', `${topOttName} 커버`],
+                datasets: [{
+                    label: '작품 수',
+                    data: [totalCount, topOttCount],
+                    backgroundColor: ['#444444', '#e50914'],
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { ticks: { color: '#ccc' }, grid: { display: false } },
+                    y: { ticks: { color: '#ccc', stepSize: 1 }, grid: { color: '#333' } }
+                }
+            }
+        });
     }
 </script>
 

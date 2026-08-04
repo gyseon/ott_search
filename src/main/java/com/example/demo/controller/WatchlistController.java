@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.IntegratedSearchResponse;
 import com.example.demo.dto.WatchlistRequest;
+import com.example.demo.dto.WatchlistStatsResponse;
 import com.example.demo.service.WatchlistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -31,5 +32,11 @@ public class WatchlistController {
     @GetMapping("/check")
     public boolean checkSaved(@RequestParam Long mediaId, @RequestParam String mediaType) {
         return watchlistService.isSaved(mediaId, mediaType);
+    }
+
+    // 내 찜 목록 통계 및 OTT 스마트 추천 가이드
+    @GetMapping("/stats")
+    public WatchlistStatsResponse getWatchlistStats() {
+        return watchlistService.getWatchlistStats();
     }
 }

@@ -4,6 +4,7 @@ import com.example.demo.domain.Watchlist;
 import com.example.demo.dto.IntegratedSearchResponse;
 import com.example.demo.dto.TmdbProviderResponse;
 import com.example.demo.dto.WatchlistRequest;
+import com.example.demo.dto.WatchlistStatsResponse;
 import com.example.demo.repository.WatchlistRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,5 +72,60 @@ public class WatchlistService {
     @Transactional(readOnly = true)
     public boolean isSaved(Long mediaId, String mediaType) {
         return watchlistRepository.existsByMediaIdAndMediaType(mediaId, mediaType);
+    }
+
+    // ✨ [신규] 내 찜 목록 기반 통계 분석 및 스마트 추천 가이드 생성
+    @Transactional(readOnly = true)
+    public WatchlistStatsResponse getWatchlistStats() {
+        List<IntegratedSearchResponse> watchlist = getMyWatchlist();
+        int totalCount = watchlist.size();
+
+        if (totalCount == 0) {
+            return WatchlistStatsResponse.builder()
+                    .totalCount(0)
+                    .ottCounts(Map.of())
+                    .genreCounts(Map.of())
+                    .topOtt("없음")
+                    .topOttCount(0)
+                    .recommendationGuide("아직 찜한 작품이 없습니다. 마음에 드는 작품을 ★ 찜해 보세요!")
+                    .build();
+        }
+
+        // 1. OTT별 작품 수 집계
+        Map<String, Long> ottCounts = watchlist.stream()
+                .filter(item -> item.getOttProviders() != null)
+                .flatMap(item -> item.getOttProviders().stream())
+                .collect(Collectors.groupingBy(
+                        TmdbProviderResponse.ProviderInfo::getProviderName,
+                        Collectors.counting()
+                ));
+
+        // 가장 작품 수가 많은 1위 OTT 도출
+        Map.Entry<String, Long> topOttEntry = ottCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .orElse(Map.entry("정보 없음", 0L));
+
+        String topOtt = topOttEntry.getKey();
+        long topOttCount = topOttEntry.getValue();
+
+        // 2. 가성비 구독 추천 스마트 가이드 문구 생성
+        String guideMessage;
+        if (topOttCount > 0) {
+            double percentage = Math.round(((double) topOttCount / totalCount) * 100);
+            guideMessage = String.format(
+                    "💡 찜한 작품의 %.0f%%(%d개)를 **%s**에서 감상할 수 있어요! 이번 달은 %s(만) 구독하는 것을 강력 추천합니다! 🔥",
+                    percentage, topOttCount, topOtt, topOtt
+            );
+        } else {
+            guideMessage = "현재 찜한 작품들 중 정액제로 제공되는 OTT 정보를 찾을 수 없습니다.";
+        }
+
+        return WatchlistStatsResponse.builder()
+                .totalCount(totalCount)
+                .ottCounts(ottCounts)
+                .topOtt(topOtt)
+                .topOttCount(topOttCount)
+                .recommendationGuide(guideMessage)
+                .build();
     }
 }
