@@ -172,12 +172,14 @@
             flex-direction: column;
             gap: 20px;
         }
+        /* 카드 관련 스타일 수정 */
         .card {
             display: flex;
             background-color: #1f1f1f;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: relative; /* ✨ 자식 요소 절대 위치(absolute) 기준점 설정 */
         }
         .poster {
             width: 140px;
@@ -261,6 +263,35 @@
         .modal-section { margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; }
         .modal-section-title { font-size: 15px; font-weight: bold; color: #e50914; margin-bottom: 8px; }
         .modal-text { font-size: 14px; color: #ddd; line-height: 1.5; }
+
+        /* 카드 헤더 행 (기존 margin-right만 약간 확보) */
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-right: 30px; /* 오른쪽 상단 별표 버튼과 제목이 겹치지 않도록 여백 확보 */
+        }
+        /* ✨ [수정] 찜하기 버튼: 17px & 오른쪽 최상단 고정 */
+        .star-btn {
+            position: absolute;
+            top: 12px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 17px; /* 요청하신 17px 설정 */
+            cursor: pointer;
+            color: #666;
+            transition: transform 0.2s, color 0.2s;
+            z-index: 10;
+            padding: 5px;
+            line-height: 1;
+        }
+        .star-btn.active {
+            color: #ffc107; /* 찜 등록 시 활성화된 골드 색상 */
+        }
+        .star-btn:hover {
+            transform: scale(1.2);
+        }
     </style>
 </head>
 <body>
@@ -272,6 +303,8 @@
     <div class="tab-menu">
         <button class="tab-btn active" id="tabSearchBtn" onclick="switchTab('search')">🔍 OTT 검색</button>
         <button class="tab-btn" id="tabTrendingBtn" onclick="switchTab('trending')">🔥 이번 주 인기 영화</button>
+        <!-- ✨ [신규] 찜 목록 탭 -->
+        <button class="tab-btn" id="tabWatchlistBtn" onclick="switchTab('watchlist')">⭐ 내 찜 목록</button>
     </div>
 
     <!-- 2. 구독 OTT 필터 -->
@@ -372,6 +405,7 @@
         currentTab = tab;
         document.getElementById('tabSearchBtn').classList.toggle('active', tab === 'search');
         document.getElementById('tabTrendingBtn').classList.toggle('active', tab === 'trending');
+        document.getElementById('tabWatchlistBtn').classList.toggle('active', tab === 'watchlist');
 
         const searchContainer = document.getElementById('searchContainer');
         resetState();
@@ -379,9 +413,13 @@
         if (tab === 'search') {
             searchContainer.style.display = 'block';
             document.getElementById('resultsList').innerHTML = '';
-        } else {
+        } else if (tab === 'trending') {
             searchContainer.style.display = 'none';
             loadData();
+        } else if (tab === 'watchlist') {
+            // ✨ 찜 목록 탭 선택 시
+            searchContainer.style.display = 'none';
+            loadWatchlistData();
         }
     }
 
@@ -594,7 +632,11 @@
                 ottHtml = `<span class="no-ott">현재 제공 중인 OTT 없음</span>`;
             }
 
+            const cleanTitle = item.title.replace(/^\[(영화|TV)\]\s*/, '');
             const mediaType = item.title.startsWith('[TV]') ? 'tv' : 'movie';
+            const posterPath = item.posterPath || '';
+            // ✨ 내 찜 목록 탭에 들어와 있거나, 백엔드 체크 시 active 적용
+            const isActive = currentTab === 'watchlist' ? 'active' : '';
 
             const cardHtml = `
                 <div class="card">
@@ -602,6 +644,10 @@
                     <div class="info">
                         <div>
                             <div class="title" onclick="openModal('${mediaType}', ${item.id})">${item.title}</div>
+                            <button class="star-btn ${isActive}" id="star-${mediaType}-${item.id}"
+                            onclick="toggleWatchlist(${item.id}, '${mediaType}', '${cleanTitle}', '${posterPath}', '${item.releaseDate}', event)">
+                                ★
+                            </button>
                             <div class="release-date">개봉/방영일: ${item.releaseDate || '정보 없음'}</div>
                             <div class="overview">${item.overview || '줄거리 정보가 없습니다.'}</div>
                         </div>
@@ -613,6 +659,11 @@
                 </div>
             `;
             resultsList.innerHTML += cardHtml;
+
+            // 검색/트렌딩 탭일 경우 실시간 DB 체크로 별 색상 동기화 (비동기)
+            if (currentTab !== 'watchlist') {
+                checkAndMarkStar(item.id, mediaType);
+            }
         });
     }
 
@@ -686,6 +737,77 @@
     window.onclick = function(event) {
         const modal = document.getElementById('detailModal');
         if (event.target === modal) closeModal();
+    }
+
+    async function loadWatchlistData() {
+        isLoading = true;
+        hasMore = false; // 찜 목록은 단일 페이지로 한 번에 불러옵니다.
+        const trigger = document.getElementById('scrollTrigger');
+        trigger.innerText = '⭐ 찜 목록 불러오는 중...';
+
+        try {
+            const response = await fetch('/api/watchlist');
+            currentRawData = await response.json();
+
+            if (currentRawData.length === 0) {
+                trigger.innerText = '저장된 찜 목록이 없습니다. 마음에 드는 작품을 찜해 보세요!';
+            } else {
+                trigger.innerText = '';
+            }
+            applyFilter();
+        } catch (error) {
+            console.error('Error:', error);
+            trigger.innerText = '찜 목록을 불러오는 중 오류가 발생했습니다.';
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    async function toggleWatchlist(mediaId, mediaType, title, posterPath, releaseDate, event) {
+        if (event) event.stopPropagation(); // 카드 클릭(모달 열기) 이벤트 방지
+
+        const payload = {
+            mediaId: mediaId,
+            mediaType: mediaType,
+            title: title,
+            posterPath: posterPath,
+            releaseDate: releaseDate
+        };
+
+        try {
+            const response = await fetch('/api/watchlist/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const isSaved = await response.json();
+
+            // 버튼 색상 즉시 변경
+            const btn = document.getElementById(`star-${mediaType}-${mediaId}`);
+            if (btn) btn.classList.toggle('active', isSaved);
+
+            // 찜 목록 탭에서 해제한 경우 목록 다시 로드
+            if (currentTab === 'watchlist') {
+                loadWatchlistData();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('처리 중 오류가 발생했습니다.');
+        }
+    }
+
+    // ✨ [신규] 검색 결과 목록 렌더링 시 DB에 이미 저장되어 있다면 별 색상 노란색으로 활성화
+    async function checkAndMarkStar(mediaId, mediaType) {
+        try {
+            const res = await fetch(`/api/watchlist/check?mediaId=${mediaId}&mediaType=${mediaType}`);
+            const isSaved = await res.json();
+            if (isSaved) {
+                const btn = document.getElementById(`star-${mediaType}-${mediaId}`);
+                if (btn) btn.classList.add('active');
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 </script>
 
