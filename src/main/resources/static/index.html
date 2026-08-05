@@ -559,8 +559,8 @@
         }
 
         try {
-            const response = await fetch(url);
-            const newData = await response.json();
+            //const response = await safeFetch(url);
+            const newData = await safeFetch(url);
 
             if (newData.length === 0) {
                 hasMore = false;
@@ -601,8 +601,8 @@
     // 실시간 자동완성 API 연동
     async function fetchAutocomplete(query) {
         try {
-            const response = await fetch(`/api/ott/search/multi/integrated?query=${encodeURIComponent(query)}&page=1`);
-            const data = await response.json();
+            //const response = await safeFetch(`/api/ott/search/multi/integrated?query=${encodeURIComponent(query)}&page=1`);
+            const data = await safeFetch(`/api/ott/search/multi/integrated?query=${encodeURIComponent(query)}&page=1`);
 
             const autoList = document.getElementById('autocompleteList');
             autoList.innerHTML = '';
@@ -725,7 +725,9 @@
             }
 
             const cleanTitle = item.title.replace(/^\[(영화|TV)\]\s*/, '');
-            const mediaType = item.title.startsWith('[TV]') ? 'tv' : 'movie';
+            const mediaType = item.mediaType
+                ? item.mediaType
+                : (item.title.startsWith('[TV]') ? 'tv' : 'movie');
             const posterPath = item.posterPath || '';
             // ✨ 내 찜 목록 탭에 들어와 있거나, 백엔드 체크 시 active 적용
             const isActive = currentTab === 'watchlist' ? 'active' : '';
@@ -768,8 +770,8 @@
         modalBody.innerHTML = '<p style="text-align:center; padding: 40px;">상세 정보 로딩 중...</p>';
 
         try {
-            const response = await fetch(`/api/ott/detail/${type}/${id}`);
-            const data = await response.json();
+            //const response = await safeFetch(`/api/ott/detail/${type}/${id}`);
+            const data = await safeFetch(`/api/ott/detail/${type}/${id}`);
 
             const title = data.title || data.name;
             const releaseDate = data.releaseDate || data.firstAirDate || '정보 없음';
@@ -838,9 +840,9 @@
         trigger.innerText = '⭐ 찜 목록 불러오는 중...';
 
         try {
-            const response = await fetch('/api/watchlist');
-            currentRawData = await response.json();
-
+            //const response = await safeFetch('/api/watchlist');
+            currentRawData = await safeFetch('/api/watchlist');
+            console.log(currentRawData);
             if (currentRawData.length === 0) {
                 trigger.innerText = '저장된 찜 목록이 없습니다. 마음에 드는 작품을 찜해 보세요!';
             } else {
@@ -867,14 +869,13 @@
         };
 
         try {
-            const response = await fetch('/api/watchlist/toggle', {
+            // fetch -> safeFetch 로 교체
+            const isSaved = await safeFetch('/api/watchlist/toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const isSaved = await response.json();
 
-            // 버튼 색상 즉시 변경
             const btn = document.getElementById(`star-${mediaType}-${mediaId}`);
             if (btn) btn.classList.toggle('active', isSaved);
 
@@ -891,8 +892,8 @@
     // ✨ [신규] 검색 결과 목록 렌더링 시 DB에 이미 저장되어 있다면 별 색상 노란색으로 활성화
     async function checkAndMarkStar(mediaId, mediaType) {
         try {
-            const res = await fetch(`/api/watchlist/check?mediaId=${mediaId}&mediaType=${mediaType}`);
-            const isSaved = await res.json();
+            //const res = await safeFetch(`/api/watchlist/check?mediaId=${mediaId}&mediaType=${mediaType}`);
+            const isSaved = await safeFetch(`/api/watchlist/check?mediaId=${mediaId}&mediaType=${mediaType}`);
             if (isSaved) {
                 const btn = document.getElementById(`star-${mediaType}-${mediaId}`);
                 if (btn) btn.classList.add('active');
@@ -908,8 +909,8 @@
     // ✨ 통계 API 호출 및 Chart.js 렌더링
     async function loadWatchlistStats() {
         try {
-            const response = await fetch('/api/watchlist/stats');
-            const stats = await response.json();
+            //const response = await safeFetch('/api/watchlist/stats');
+            const stats = await safeFetch('/api/watchlist/stats');
 
             // 1. 스마트 가이드 문구 업데이트
             document.getElementById('recommendationText').innerHTML = stats.recommendationGuide;
@@ -992,6 +993,22 @@
                 }
             }
         });
+    }
+
+    // safeFetch 정의
+    async function safeFetch(url, options = {}) {
+        const response = await fetch(url, options);
+
+        // HTTP 상태 코드가 200~299가 아니면 (400, 404, 500 등 에러라면)
+        if (!response.ok) {
+            // 백엔드 GlobalExceptionHandler가 보내준 ErrorResponse JSON 파싱
+            const errorData = await response.json().catch(() => null);
+            const errorMsg = errorData ? errorData.message : '요청 처리 중 오류가 발생했습니다.';
+
+            // 예외를 직접 던져서 catch 블록으로 보냄!
+            throw new Error(errorMsg);
+        }
+        return await response.json();
     }
 </script>
 

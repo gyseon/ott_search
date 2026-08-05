@@ -1,10 +1,13 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.*;
+import com.example.demo.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -220,16 +223,25 @@ public class TmdbService {
     @Cacheable(value = "movieDetails", key = "#type + '_' + #id")
     public TmdbDetailResponse getDetail(String type, Long id) {
         String path = "movie".equals(type) ? "/movie/{id}" : "/tv/{id}";
-
-        return tmdbWebClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(path)
-                        .queryParam("language", "ko-KR")
-                        .queryParam("append_to_response", "credits") // 출연진/감독 정보 함께 요청
-                        .build(id))
-                .retrieve()
-                .bodyToMono(TmdbDetailResponse.class)
-                .block();
+        try {
+            return tmdbWebClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path(path)
+                            .queryParam("language", "ko-KR")
+                            .queryParam("append_to_response", "credits") // 출연진/감독 정보 함께 요청
+                            .build(id))
+                    .retrieve()
+                    .bodyToMono(TmdbDetailResponse.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            // TMDB가 404 Not Found 응답을 준 경우 CustomException으로 변환
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new CustomException("MEDIA_NOT_FOUND", "해당 작품의 상세 정보를 찾을 수 없습니다. (ID: " + id + ")", HttpStatus.NOT_FOUND);
+            }
+            throw new CustomException("TMDB_API_ERROR", "TMDB API 호출 중 오류가 발생했습니다.", HttpStatus.BAD_GATEWAY);
+        } catch (Exception e) {
+            throw new CustomException("INTERNAL_ERROR", "상세 정보 처리 중 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // --- 비동기 Mono 반환 Helper 메서드 ---
@@ -239,8 +251,11 @@ public class TmdbService {
                 .uri("/movie/{id}/watch/providers", movieId)
                 .retrieve()
                 .bodyToMono(TmdbProviderResponse.class)
+                .timeout(java.time.Duration.ofSeconds(3))  // ⏳ 3초 이상 응답 없으면 타임아웃
+                .retryWhen(reactor.util.retry.Retry.max(2) // 🔄 네트워크 지연 시 최대 2회 재시도
+                        .filter(throwable -> !(throwable instanceof org.springframework.web.reactive.function.client.WebClientResponseException.NotFound)))
                 .map(res -> res.getResults() != null ? res.getResults().get("KR") : null)
-                .onErrorReturn(new TmdbProviderResponse.CountryProvider()); // 에러 발생 시 빈 객체 반환
+                .onErrorReturn(new TmdbProviderResponse.CountryProvider()); // 🛡️ 장애 시 빈 객체로 Fallback (서비스 중단 방지)
     }
 
     public Mono<TmdbProviderResponse.CountryProvider> getTvProvidersAsync(Long tvId) {
@@ -248,6 +263,9 @@ public class TmdbService {
                 .uri("/tv/{id}/watch/providers", tvId)
                 .retrieve()
                 .bodyToMono(TmdbProviderResponse.class)
+                .timeout(java.time.Duration.ofSeconds(3))
+                .retryWhen(reactor.util.retry.Retry.max(2)
+                        .filter(throwable -> !(throwable instanceof org.springframework.web.reactive.function.client.WebClientResponseException.NotFound)))
                 .map(res -> res.getResults() != null ? res.getResults().get("KR") : null)
                 .onErrorReturn(new TmdbProviderResponse.CountryProvider());
     }

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ott-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ott-service-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      # TMDB API Key 등의 환경 변수가 필요하다면 여기서 주입 가능합니다.
+      # - TMDB_API_KEY=3d20544f06ae3268556abdc6394baec6
+    restart: always

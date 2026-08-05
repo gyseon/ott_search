@@ -60,6 +60,7 @@ public class WatchlistService {
             resultList.add(IntegratedSearchResponse.builder()
                     .id(item.getMediaId())
                     .title(item.getTitle())
+                    .mediaType(item.getMediaType())
                     .posterPath(item.getPosterPath())
                     .releaseDate(item.getReleaseDate())
                     .ottProviders(ottList)
