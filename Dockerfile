@@ -12,6 +12,8 @@ COPY gradle gradle
 COPY gradlew build.gradle settings.gradle ./
 COPY src src
 
+#gradlew 파일에 실행 권한(+x) 부여
+RUN chmod +x ./gradlew
 # 애플리케이션 빌드 (테스트 제외로 빠른 빌드)
 RUN ./gradlew build -x test --no-daemon
 
